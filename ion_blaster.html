@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ION BLASTER - 이온식 맞추기</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; background: #0a0e1a; overflow: hidden; font-family: 'Courier New', monospace; }
+#gameCanvas { display: block; position: absolute; top: 0; left: 0; }
+#ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+
+#header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 20px;
+  background: rgba(10,14,26,0.9);
+  border-bottom: 1px solid rgba(55,138,221,0.4);
+}
+#score-area { display: flex; gap: 20px; }
+.stat { display: flex; flex-direction: column; align-items: center; }
+.stat-label { font-size: 10px; color: #378ADD; letter-spacing: 2px; }
+.stat-value { font-size: 20px; font-weight: bold; color: #fff; }
+#lives-area { display: flex; gap: 5px; align-items: center; font-size: 20px; }
+
+#diff-bar {
+  display: flex; pointer-events: all;
+  padding: 6px 20px; gap: 0;
+  background: rgba(10,14,26,0.8);
+  border-bottom: 1px solid rgba(55,138,221,0.2);
+}
+.diff-btn {
+  flex: 1; max-width: 100px; padding: 4px 0;
+  font-family: 'Courier New', monospace; font-size: 12px;
+  border: 1px solid rgba(55,138,221,0.5); background: transparent;
+  color: #378ADD; cursor: pointer; transition: all 0.2s;
+}
+.diff-btn:first-child { border-radius: 4px 0 0 4px; }
+.diff-btn:last-child { border-radius: 0 4px 4px 0; }
+.diff-btn.active { background: #378ADD; color: #0a0e1a; font-weight: bold; }
+.diff-btn:hover:not(.active) { background: rgba(55,138,221,0.2); }
+
+#progress-bar-wrap {
+  height: 4px; background: rgba(55,138,221,0.15);
+  border-bottom: 1px solid rgba(55,138,221,0.2);
+}
+#progress-bar { height: 100%; background: #378ADD; width: 0%; transition: width 0.3s; }
+
+#target-display {
+  position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%);
+  text-align: center; pointer-events: none;
+  background: rgba(10,14,26,0.8);
+  padding: 8px 28px; border-radius: 8px;
+  border: 1px solid rgba(55,138,221,0.35);
+  white-space: nowrap;
+}
+#target-label { font-size: 10px; color: #9FE1CB; letter-spacing: 3px; margin-bottom: 4px; }
+#target-name { font-size: 24px; font-weight: bold; color: #fff; letter-spacing: 1px; }
+
+#message {
+  position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%);
+  font-size: 28px; font-weight: bold; color: #5DCAA5;
+  text-align: center; pointer-events: none; opacity: 0;
+  transition: opacity 0.3s; text-shadow: 0 0 20px rgba(93,202,165,0.6);
+  white-space: nowrap;
+}
+#message.wrong { color: #E24B4A; text-shadow: 0 0 20px rgba(226,75,74,0.6); }
+
+#level-up {
+  position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+  font-size: 36px; font-weight: bold; color: #FAC775;
+  pointer-events: none; opacity: 0; transition: opacity 0.4s; letter-spacing: 4px;
+  text-shadow: 0 0 30px rgba(250,199,117,0.7);
+}
+
+#gameover {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(10,14,26,0.93);
+  display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  pointer-events: all;
+}
+#gameover h2 { font-size: 36px; color: #5DCAA5; letter-spacing: 4px; }
+#gameover h2.fail { color: #E24B4A; }
+#gameover .final-score { font-size: 52px; color: #fff; font-weight: bold; }
+#gameover .sub { font-size: 14px; color: #378ADD; }
+#gameover .restart-btn {
+  margin-top: 10px; padding: 10px 40px; font-size: 15px;
+  font-family: 'Courier New', monospace;
+  border: 1px solid #5DCAA5; background: transparent;
+  color: #5DCAA5; cursor: pointer; border-radius: 4px; transition: all 0.2s;
+}
+#gameover .restart-btn:hover { background: #5DCAA5; color: #0a0e1a; }
+
+#start-screen {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(10,14,26,0.97);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  pointer-events: all;
+}
+#start-screen h1 { font-size: 34px; color: #5DCAA5; letter-spacing: 5px; }
+#start-screen .subtitle { font-size: 13px; color: #378ADD; letter-spacing: 2px; }
+#start-screen .howto {
+  font-size: 13px; color: #aaa; text-align: center; line-height: 2;
+  max-width: 340px; margin-top: 8px;
+  border: 1px solid rgba(55,138,221,0.2); padding: 14px 24px; border-radius: 8px;
+}
+#start-screen .howto span { color: #FAC775; }
+#start-screen .start-btn {
+  margin-top: 12px; padding: 12px 50px; font-size: 16px;
+  font-family: 'Courier New', monospace;
+  border: 1px solid #5DCAA5; background: transparent;
+  color: #5DCAA5; cursor: pointer; border-radius: 4px; transition: all 0.2s; letter-spacing: 2px;
+}
+#start-screen .start-btn:hover { background: #5DCAA5; color: #0a0e1a; }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<div id="ui">
+  <div id="header">
+    <div id="score-area">
+      <div class="stat"><span class="stat-label">SCORE</span><span class="stat-value" id="scoreVal">0</span></div>
+      <div class="stat"><span class="stat-label">문제</span><span class="stat-value" id="qVal">0/20</span></div>
+      <div class="stat"><span class="stat-label">COMBO</span><span class="stat-value" id="comboVal">0</span></div>
+    </div>
+    <div id="lives-area"></div>
+  </div>
+  <div id="diff-bar">
+    <button class="diff-btn active" onclick="setDiff(0)">쉬움</button>
+    <button class="diff-btn" onclick="setDiff(1)">보통</button>
+    <button class="diff-btn" onclick="setDiff(2)">어려움</button>
+  </div>
+  <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+  <div id="target-display">
+    <div id="target-label">▶ 맞춰야 할 이온</div>
+    <div id="target-name">-</div>
+  </div>
+  <div id="message"></div>
+  <div id="level-up">LEVEL UP!</div>
+  <div id="gameover">
+    <h2 id="goTitle">CLEAR!</h2>
+    <div class="final-score" id="finalScore">0점</div>
+    <div class="sub" id="statsMsg"></div>
+    <div class="sub" id="accMsg"></div>
+    <button class="restart-btn" onclick="restartGame()">▶ 다시 시작</button>
+  </div>
+  <div id="start-screen">
+    <h1>⚛ ION BLASTER</h1>
+    <div class="subtitle">이온식 맞추기 슈팅 게임</div>
+    <div class="howto">
+      <span>← →</span> 방향키로 비행기 이동<br>
+      <span>스페이스바</span>로 발사<br>
+      이온 이름에 해당하는 이온식을 맞추세요<br>
+      총 <span>20문항</span> · 목숨 <span>3개</span>
+    </div>
+    <button class="start-btn" onclick="startGame()">게임 시작</button>
+  </div>
+</div>
+
+<script>
+const TOTAL_Q = 20;
+
+const IONS = [
+  {name:"수소 이온",      formula:"H⁺",      decoys:["H²⁺","H⁻","H₂⁺","H²⁻"]},
+  {name:"리튬 이온",      formula:"Li⁺",     decoys:["Li²⁺","Li⁻","Li₂⁺","L⁺"]},
+  {name:"나트륨 이온",    formula:"Na⁺",     decoys:["Na²⁺","Na⁻","Na₂⁺","N⁺"]},
+  {name:"칼륨 이온",      formula:"K⁺",      decoys:["K²⁺","K⁻","K₂⁺","Ca⁺"]},
+  {name:"암모늄 이온",    formula:"NH₄⁺",    decoys:["NH₃⁺","NH₄²⁺","NH₂⁺","N₄H⁺"]},
+  {name:"은 이온",        formula:"Ag⁺",     decoys:["Ag²⁺","Ag⁻","Ag₂⁺","Au⁺"]},
+  {name:"마그네슘 이온",  formula:"Mg²⁺",    decoys:["Mg⁺","Mg³⁺","Mn²⁺","Mg²⁻"]},
+  {name:"칼슘 이온",      formula:"Ca²⁺",    decoys:["Ca⁺","Ca³⁺","Co²⁺","Ca²⁻"]},
+  {name:"구리 이온",      formula:"Cu²⁺",    decoys:["Cu⁺","Cu³⁺","Co²⁺","Cu²⁻"]},
+  {name:"납 이온",        formula:"Pb²⁺",    decoys:["Pb⁺","Pb³⁺","Pb²⁻","P²⁺"]},
+  {name:"알루미늄 이온",  formula:"Al³⁺",    decoys:["Al²⁺","Al⁺","Al³⁻","Al⁴⁺"]},
+  {name:"철 이온",        formula:"Fe³⁺",    decoys:["Fe²⁺","Fe⁺","Fe³⁻","Fe₃⁺"]},
+  {name:"산화 이온",      formula:"O²⁻",     decoys:["O⁻","O³⁻","O²⁺","OH²⁻"]},
+  {name:"플루오린화 이온",formula:"F⁻",      decoys:["F²⁻","F⁺","F₂⁻","Cl⁻"]},
+  {name:"황화 이온",      formula:"S²⁻",     decoys:["S⁻","S³⁻","S²⁺","SO²⁻"]},
+  {name:"염화 이온",      formula:"Cl⁻",     decoys:["Cl²⁻","Cl⁺","Cl₂⁻","F⁻"]},
+  {name:"수산화 이온",    formula:"OH⁻",     decoys:["OH²⁻","OH⁺","O⁻H","HO²⁻"]},
+  {name:"질산 이온",      formula:"NO₃⁻",    decoys:["NO₂⁻","NO₃²⁻","NO₄⁻","N₃O⁻"]},
+  {name:"탄산 이온",      formula:"CO₃²⁻",   decoys:["CO₃⁻","CO₂²⁻","CO₄²⁻","HCO₃⁻"]},
+  {name:"황산 이온",      formula:"SO₄²⁻",   decoys:["SO₃²⁻","SO₄⁻","SO₄³⁻","S₂O₄²⁻"]},
+  {name:"아이오딘화 이온",formula:"I⁻",      decoys:["I²⁻","I⁺","I₂⁻","Br⁻"]},
+];
+
+const DIFF_CFG = [
+  {label:"쉬움",   speed:1.8, choices:3, scoreBase:10, scoreCombo:4},
+  {label:"보통",   speed:2.7, choices:4, scoreBase:15, scoreCombo:6},
+  {label:"어려움", speed:3.8, choices:5, scoreBase:20, scoreCombo:8},
+];
+const LEVEL_SPEED_MULT = [1.0, 1.25, 1.55, 1.9, 2.3];
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+resize();
+window.addEventListener('resize', resize);
+
+let state = 'start', diffIdx = 0;
+let score = 0, lives = 3, combo = 0, level = 1;
+let qCount = 0; // 출제된 문항 수
+let totalHit = 0, totalMiss = 0;
+let targets = [], bullets = [], particles = [], stars = [];
+let plane = {x:400, y:500, vx:0};
+let keys = {};
+let frame = 0, levelTimer = 0;
+let targetIon = null;
+let msgTimer = 0;
+let animId = null;
+let waitingNext = false; // 다음 wave 대기 플래그
+
+function initStars() {
+  stars = [];
+  for (let i = 0; i < 120; i++)
+    stars.push({x:Math.random()*2000, y:Math.random()*1200, r:Math.random()*1.5+0.3, spd:Math.random()*0.4+0.1, alpha:Math.random()*0.7+0.3});
+}
+initStars();
+
+function setDiff(i) {
+  diffIdx = i;
+  document.querySelectorAll('.diff-btn').forEach((b,j) => b.classList.toggle('active', i===j));
+}
+
+function getLevelPool() {
+  const s1 = ["수소 이온","리튬 이온","나트륨 이온","칼륨 이온","암모늄 이온","은 이온",
+              "플루오린화 이온","염화 이온","수산화 이온","질산 이온","아이오딘화 이온"];
+  const s2 = ["마그네슘 이온","칼슘 이온","구리 이온","납 이온","산화 이온","황화 이온","탄산 이온","황산 이온"];
+  if (level <= 2) return IONS.filter(i => s1.includes(i.name));
+  if (level <= 4) return IONS.filter(i => s1.includes(i.name) || s2.includes(i.name));
+  return IONS;
+}
+
+function spawnWave() {
+  if (qCount >= TOTAL_Q) { gameOver(true); return; }
+  qCount++;
+  updateUI();
+
+  const d = DIFF_CFG[diffIdx];
+  const pool = getLevelPool();
+  targetIon = pool[Math.floor(Math.random() * pool.length)];
+  const n = d.choices;
+
+  // 정답 후보 1개
+  const candidates = [{formula: targetIon.formula, isAnswer: true}];
+
+  // 오답 후보: 레벨3 이상이면 decoys 우선, 부족하면 다른 이온식, 그래도 부족하면 decoys 재사용
+  const decoys = targetIon.decoys ? [...targetIon.decoys] : [];
+  const otherFormulas = pool
+    .filter(i => i !== targetIon)
+    .sort(() => Math.random()-0.5)
+    .map(i => i.formula);
+
+  // 오답 풀 = decoys + 다른 실제 이온식 (레벨 무관하게 항상 섞어서 n-1개 확보)
+  const decoyPool = level >= 3
+    ? [...decoys, ...otherFormulas]
+    : [...otherFormulas, ...decoys];
+
+  // 중복 없이 n-1개 채우되, 부족하면 decoys 반복 사용
+  const used = new Set([targetIon.formula]);
+  let pi = 0;
+  while (candidates.length < n) {
+    if (pi < decoyPool.length) {
+      const f = decoyPool[pi++];
+      if (!used.has(f)) { used.add(f); candidates.push({formula:f, isAnswer:false}); }
+    } else {
+      // 완전히 부족한 경우: decoys에서 강제 추가 (중복 허용)
+      const f = decoys[candidates.length % decoys.length] || ('X' + candidates.length);
+      candidates.push({formula:f, isAnswer:false});
+    }
+  }
+  candidates.sort(() => Math.random()-0.5);
+
+  const lvMult = LEVEL_SPEED_MULT[Math.min(level-1, 4)];
+  const spacing = W / (candidates.length + 1);
+  const wid = Date.now();
+  targets = candidates.map((c, i) => ({
+    formula: c.formula,
+    isAnswer: c.isAnswer,
+    waveId: wid,
+    x: spacing * (i+1),
+    y: -50,
+    vy: d.speed * lvMult * (0.75 + Math.random()*0.5),
+    w: 96, h: 48,
+    hit: false,
+  }));
+  waitingNext = false;
+  document.getElementById('target-name').textContent = targetIon.name;
+}
+
+function drawRoundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w,y+h-r); ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+  ctx.lineTo(x+r,y+h); ctx.arcTo(x,y+h,x,y+h-r,r);
+  ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r);
+  ctx.closePath();
+}
+
+function drawTarget(t) {
+  ctx.save();
+  ctx.translate(t.x, t.y);
+  ctx.fillStyle = 'rgba(15,25,55,0.88)';
+  ctx.strokeStyle = 'rgba(55,138,221,0.5)';
+  ctx.lineWidth = 1;
+  drawRoundRect(-t.w/2,-t.h/2,t.w,t.h,10);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#85B7EB';
+  ctx.font = 'bold 18px Courier New';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(t.formula, 0, 0);
+  ctx.restore();
+}
+
+function drawPlane(x, y) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.shadowColor='#378ADD'; ctx.shadowBlur=10;
+  ctx.fillStyle='#378ADD';
+  ctx.beginPath(); ctx.moveTo(0,-20); ctx.lineTo(-15,15); ctx.lineTo(-5,9); ctx.lineTo(0,13); ctx.lineTo(5,9); ctx.lineTo(15,15); ctx.closePath(); ctx.fill();
+  ctx.shadowBlur=0;
+  ctx.fillStyle='#B5D4F4';
+  ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(-4,7); ctx.lineTo(4,7); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#5DCAA5';
+  ctx.beginPath(); ctx.arc(0,-5,5,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+function spawnParticles(x, y, color, n=18) {
+  for (let i=0;i<n;i++) {
+    const a=(Math.PI*2/n)*i+Math.random()*0.3, s=2+Math.random()*5;
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,color,r:2+Math.random()*2});
+  }
+}
+
+function showMsg(txt, wrong) {
+  const el = document.getElementById('message');
+  el.textContent = txt; el.className = wrong ? 'wrong' : '';
+  el.style.opacity='1'; msgTimer=55;
+}
+
+function showLevelUp() {
+  const el = document.getElementById('level-up');
+  el.style.opacity='1'; setTimeout(()=>{ el.style.opacity='0'; }, 1200);
+}
+
+function updateUI() {
+  document.getElementById('scoreVal').textContent = score;
+  document.getElementById('comboVal').textContent = combo;
+  document.getElementById('qVal').textContent = qCount + '/' + TOTAL_Q;
+  document.getElementById('progress-bar').style.width = (qCount/TOTAL_Q*100) + '%';
+  const la = document.getElementById('lives-area');
+  la.innerHTML='';
+  for (let i=0;i<3;i++) {
+    const s=document.createElement('span');
+    s.style.color=i<lives?'#E24B4A':'#333'; s.style.fontSize='20px';
+    s.textContent=i<lives?'♥':'♡'; la.appendChild(s);
+  }
+}
+
+function nextWave() {
+  if (waitingNext) return;
+  waitingNext = true;
+  // 현재 wave 블록 전부 제거 후 즉시 다음 wave
+  targets = [];
+  bullets = [];
+  spawnWave();
+}
+
+function gameLoop() {
+  if (state !== 'play') return;
+  frame++; levelTimer++;
+
+  if (levelTimer > 600 && level < 5) {
+    level++; levelTimer=0; showLevelUp();
+    document.getElementById('levelVal') && (document.getElementById('levelVal').textContent=level);
+    stars.forEach(s=>{ s.spd=Math.min(s.spd*1.3,2.5); });
+  }
+
+  ctx.fillStyle='#0a0e1a'; ctx.fillRect(0,0,W,H);
+
+  stars.forEach(s=>{
+    s.y+=s.spd; if(s.y>H){s.y=0;s.x=Math.random()*W;}
+    ctx.globalAlpha=s.alpha; ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha=1;
+
+  // 첫 wave
+  if (targets.length===0 && targetIon===null) spawnWave();
+
+  targets.forEach(t=>{ if(!t.hit) t.y+=t.vy; });
+
+  // 정답 블록이 화면 밖으로 나가면 → 놓친 것
+  targets = targets.filter(t => {
+    if (t.y > H+60 && !t.hit) {
+      if (t.isAnswer) {
+        lives--; combo=0; totalMiss++;
+        updateUI();
+        showMsg('놓쳤다!', true);
+        if (lives<=0) { gameOver(false); return false; }
+        nextWave();
+      }
+      return false;
+    }
+    return true;
+  });
+
+  if (keys['ArrowLeft'])       plane.vx=Math.max(plane.vx-1.4,-9);
+  else if (keys['ArrowRight']) plane.vx=Math.min(plane.vx+1.4,9);
+  else                         plane.vx*=0.82;
+  plane.x=Math.max(24,Math.min(W-24,plane.x+plane.vx));
+  plane.y=H-80;
+
+  bullets=bullets.filter(b=>b.y>-10);
+  bullets.forEach(b=>{ b.y-=11; });
+
+  // 충돌 판정 — 현재 wave 소속 블록만 처리
+  const curWaveId = targets.length>0 ? targets[0].waveId : null;
+  bullets.forEach(b=>{
+    if (b.remove) return;
+    targets.forEach(t=>{
+      if (t.hit || b.remove || t.waveId!==curWaveId) return;
+      if (b.x>t.x-t.w/2 && b.x<t.x+t.w/2 && b.y>t.y-t.h/2 && b.y<t.y+t.h/2) {
+        b.remove=true; t.hit=true;
+        if (t.isAnswer) {
+          combo++; totalHit++;
+          const pts = 50;
+          score += pts;
+          spawnParticles(t.x,t.y,'#5DCAA5');
+          showMsg(combo>=3?`🔥 COMBO x${combo}! +${pts}`:`정답! +${pts}`, false);
+          nextWave();
+        } else {
+          lives--; combo=0; totalMiss++;
+          spawnParticles(t.x,t.y,'#E24B4A',12);
+          showMsg('틀렸다! ♥ -1', true);
+          if (lives<=0) { gameOver(false); }
+        }
+        updateUI();
+      }
+    });
+  });
+  bullets=bullets.filter(b=>!b.remove);
+
+  targets.forEach(t=>{ if(!t.hit) drawTarget(t); });
+
+  bullets.forEach(b=>{
+    ctx.save(); ctx.shadowColor='#FAC775'; ctx.shadowBlur=10;
+    ctx.fillStyle='#FAC775'; ctx.fillRect(b.x-2,b.y-10,4,14);
+    ctx.restore();
+  });
+
+  particles=particles.filter(p=>p.life>0.02);
+  particles.forEach(p=>{
+    p.x+=p.vx; p.y+=p.vy; p.vy+=0.12; p.life-=0.035;
+    ctx.globalAlpha=p.life; ctx.fillStyle=p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha=1;
+
+  ctx.globalAlpha=0.5+Math.random()*0.4;
+  ctx.fillStyle='#FAC775';
+  ctx.beginPath(); ctx.arc(plane.x,plane.y+14+Math.random()*4,4+Math.random()*3,0,Math.PI*2); ctx.fill();
+  ctx.globalAlpha=1;
+
+  drawPlane(plane.x,plane.y);
+
+  if (msgTimer>0){ msgTimer--; if(msgTimer===0) document.getElementById('message').style.opacity='0'; }
+
+  animId=requestAnimationFrame(gameLoop);
+}
+
+function gameOver(cleared) {
+  state='over';
+  if(animId) cancelAnimationFrame(animId);
+  const total=totalHit+totalMiss;
+  const acc=total>0?Math.round(totalHit/total*100):0;
+  const title=document.getElementById('goTitle');
+  title.textContent=cleared?'CLEAR!':'GAME OVER';
+  title.className=cleared?'':'fail';
+  document.getElementById('finalScore').textContent=score+'점';
+  document.getElementById('statsMsg').textContent=`정답 ${totalHit}개 · 오답 ${totalMiss}개`;
+  document.getElementById('accMsg').textContent=`정확도 ${acc}%`;
+  document.getElementById('gameover').style.display='flex';
+}
+
+function initGame() {
+  score=0; lives=3; combo=0; level=1; qCount=0;
+  totalHit=0; totalMiss=0; frame=0; levelTimer=0;
+  plane.x=W/2; plane.y=H-80; plane.vx=0;
+  targets=[]; bullets=[]; particles=[];
+  targetIon=null; waitingNext=false;
+  document.getElementById('target-name').textContent='-';
+  updateUI();
+}
+
+function startGame() {
+  document.getElementById('start-screen').style.display='none';
+  initGame(); state='play'; gameLoop();
+}
+
+function restartGame() {
+  document.getElementById('gameover').style.display='none';
+  initGame(); state='play'; gameLoop();
+}
+
+document.addEventListener('keydown', e=>{
+  keys[e.code]=true;
+  if (e.code==='Space') {
+    e.preventDefault();
+    if (state==='play') bullets.push({x:plane.x, y:plane.y-22, remove:false});
+  }
+});
+document.addEventListener('keyup', e=>{ keys[e.code]=false; });
+
+updateUI();
+</script>
+</body>
+</html>
