@@ -364,7 +364,14 @@ function updateUI() {
 function nextWave() {
   if (waitingNext) return;
   waitingNext = true;
-  // 현재 wave 블록 전부 제거 후 즉시 다음 wave
+  targets = [];
+  bullets = [];
+  spawnWave();
+}
+
+function forceNextWave() {
+  // 놓쳤을 때 - waitingNext 무시하고 강제 실행
+  waitingNext = false;
   targets = [];
   bullets = [];
   spawnWave();
@@ -402,7 +409,7 @@ function gameLoop() {
         updateUI();
         showMsg('놓쳤다!', true);
         if (lives<=0) { gameOver(false); return false; }
-        nextWave();
+        forceNextWave();
       }
       return false;
     }
@@ -437,6 +444,7 @@ function gameLoop() {
           lives--; combo=0; totalMiss++;
           spawnParticles(t.x,t.y,'#E24B4A',12);
           showMsg('틀렸다! ♥ -1', true);
+          waitingNext = false;
           if (lives<=0) { gameOver(false); }
         }
         updateUI();
